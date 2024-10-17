@@ -77,47 +77,42 @@ void get_out(Thread* thread, Room *room) {
 }
 
 
-void main(int argc, char* argv[]) {
-    // Get input file name
-    char* entry_file = argv[1];
-
-    // Open the file for reading
-    FILE *file = fopen(entry_file, "r");
-
-    // Read the total number of rooms and threads
+void main() {
+    // Read the total number of rooms and threads from stdin
     int n_rooms, n_threads;
-    fscanf(file, "%d %d", &n_rooms, &n_threads);
+    scanf("%d %d", &n_rooms, &n_threads);
 
     // Generate rooms vector
     Room* rooms = (Room*)calloc(n_rooms, sizeof(Room));
-    for(int i = 0; i < n_rooms; i++) rooms[i] = new_room(i);
+    for (int i = 0; i < n_rooms; i++) rooms[i] = new_room(i);
 
     // Generate threads vector
     Thread* threads = (Thread*)malloc(n_threads * sizeof(Thread));
-    for (int t = 0; t < n_threads; t++){
+    for (int t = 0; t < n_threads; t++) {
         int t_id, t_i_time, n_rooms;
-        fscanf(file, "%d %d %d", &t_id, &t_i_time, &n_rooms);
+        scanf("%d %d %d", &t_id, &t_i_time, &n_rooms);
 
         // Initialize thread 
         threads[t] = new_thread(t_id, t_i_time, n_rooms);
 
         // Add rooms to thread
-        for (int r = 0; r < n_rooms; r++){
+        for (int r = 0; r < n_rooms; r++) {
             int r_id, r_time;
+            scanf("%d %d", &r_id, &r_time); // Read room IDs and times
             threads[t].room_ids[r] = r_id;
             threads[t].room_times[r] = r_time;
         }
     }
 
-    for (int t = 0; t < n_threads; t++){
+    for (int t = 0; t < n_threads; t++) {
         Thread* thread = &threads[t];
         int* step = &thread->curr_room_index;
-        if (step == -1){
+        if (*step == -1) {
             passa_tempo(thread->id, 0, thread->init_time);
-            *step++;
+            (*step)++;
         }
-        for (int r = 0; r < thread->n_rooms; r++){
-            get_in(thread, &rooms[*step]);  
+        for (int r = 0; r < thread->n_rooms; r++) {
+            get_in(thread, &rooms[*step]);
             get_out(thread, &rooms[*step]);
         }
     }
@@ -129,9 +124,4 @@ void main(int argc, char* argv[]) {
     // Free rooms
     for (int i = 0; i < n_rooms; i++) free(&rooms[i]);
     free(rooms);
-
-    // Close the file after reading
-    fclose(file);
-
-    return;
 }

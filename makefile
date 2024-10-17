@@ -8,7 +8,7 @@ TIMED_RUN = time ./threads-manager
 
 all: threads-manager
 
-scrabble: $(OBJ)
+threads-manager: $(OBJ)
 	$(CC) $(CFLAGS) $^ -o $@
 
 %.o: %.c $(DEPS)
