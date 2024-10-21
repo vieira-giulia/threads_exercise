@@ -1,27 +1,38 @@
+# Nome do executável
+EXEC = ep1
+
+# Lista de arquivos fonte
+SRCS = main.c
+
+# Lista de arquivos objeto
+OBJS = $(SRCS:.c=.o)
+
+# Compilador
 CC = gcc
-CFLAGS = -g -O0 -Wall -Wextra -std=c99 -pedantic
-OBJ = main.o threads.o rooms.o
-DEPS = threads.h rooms.h
-VFLAGS = -v --leak-check=full --leak-resolution=high --show-reachable=yes --track-origins=yes
-EXEC = ./threads-manager entrada.txt
-TIMED_RUN = time ./threads-manager 
 
-all: threads-manager
+# Flags de compilação
+CFLAGS = -Wall -pthread
 
-threads-manager: $(OBJ)
-	$(CC) $(CFLAGS) $^ -o $@
+# Regra padrão é build
+build: $(EXEC)
 
-%.o: %.c $(DEPS)
+# Linka os arquivos objeto e gera o executável
+$(EXEC): $(OBJS)
+	$(CC) $(CFLAGS) -o $(EXEC) $(OBJS)
+
+# Regra para compilar os arquivos .c em .o
+%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# Regra para executar o programa
+run: $(EXEC)
+	./$(EXEC)
+
+# Regra clean para remover executáveis e arquivos objeto
 clean:
-	rm -f *.o threads-manager
+	rm -f $(EXEC) $(OBJS)
 
-valgrind:
-	valgrind $(VFLAGS) $(EXEC)
-
-run:
-	$(EXEC)
-
-timed:
-	$(TIMED_RUN)
+# Como rodar:
+#   'make' compilará o programa
+#   'make run' executará o programa
+#   'make clean' limpará o ambiente de compilação
