@@ -89,8 +89,8 @@ void entra(int tid, int sala, int tempo) {
     salas[sala - 1].esperando++;
 
     // Wait until the room is empty and there are at least 3 threads waiting
-    while (salas[sala - 1].ocupacao > 0 || salas[sala - 1].esperando < GROUP_SIZE) 
-        pthread_cond_wait(&salas[sala - 1].cond_espera, &salas[sala - 1].mutex);
+    //while (salas[sala - 1].ocupacao > 0 || salas[sala - 1].esperando < GROUP_SIZE)
+    while (salas[sala - 1].ocupacao > 0) pthread_cond_wait(&salas[sala - 1].cond_espera, &salas[sala - 1].mutex);
 
     // Espera na barreira até 3 estarem juntos para entrar
     pthread_barrier_wait(&salas[sala - 1].porta);
@@ -211,10 +211,10 @@ int main() {
     }
 
     // Destrói mutexes e variáveis de condição
+    pthread_barrierattr_destroy(&attr);
     for (int i = 0; i < S; i++) {
         pthread_mutex_destroy(&salas[i].mutex);
         pthread_cond_destroy(&salas[i].cond_espera);
-        pthread_barrierattr_destroy(&attr);
         pthread_barrier_destroy(&salas[i].porta);
     }
 
