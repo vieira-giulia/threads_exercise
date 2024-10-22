@@ -1,5 +1,3 @@
-#define _POSIX_C_SOURCE 200112L
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -88,34 +86,26 @@ void entra(int tid, int sala, int tempo) {
     // Entra na fila para entrar na sala
     salas[sala - 1].esperando++;
 
-    // Wait until the room is empty and there are at least 3 threads waiting
-    //while (salas[sala - 1].ocupacao > 0 || salas[sala - 1].esperando < GROUP_SIZE)
-    while (salas[sala - 1].ocupacao > 0) pthread_cond_wait(&salas[sala - 1].cond_espera, &salas[sala - 1].mutex);
+    // Espera até que a sala esteja vazia
+    while (salas[sala - 1].ocupacao > 0){
+        pthread_cond_wait(&salas[sala - 1].cond_espera, &salas[sala - 1].mutex);
+        // Permite que outras threads prossigam enquanto essa está aguardando
+        sched_yield();
+    }
+
+    pthread_mutex_unlock(&salas[sala - 1].mutex);
 
     // Espera na barreira até 3 estarem juntos para entrar
     pthread_barrier_wait(&salas[sala - 1].porta);
+    // Permite que outras threads prossigam enquanto essa está aguardando
+    sched_yield();
 
-    // Sala ocupada por 3 threads
-    salas[sala - 1].ocupacao += GROUP_SIZE;
+    // Sala ocupada por essa thread
+    salas[sala - 1].ocupacao++;
     
-    // 3 threads sairam da fila para entrar na sala
-    salas[sala - 1].esperando -= GROUP_SIZE;
+    // Thread saiu da fila
+    salas[sala - 1].esperando--;
 
-    pthread_mutex_unlock(&salas[sala - 1].mutex);
-    
-    // // Thread espera sala ficar vazia
-    // while (salas[sala - 1].ocupacao > 0) pthread_cond_wait(&salas[sala - 1].cond_espera, &salas[sala - 1].mutex);
-
-    // // Se houverem pelo menos 3 threads querendo entrar na sala, avisa as outras para entrar e entra
-    // if (salas[sala - 1].esperando >= GROUP_SIZE){
-    //     pthread_cond_broadcast(&salas[sala - 1].cond_group);
-    //     salas[sala - 1].ocupacao++;
-    //     salas[sala - 1].esperando--;   
-    // } 
-    // // Se não, espera pelo aviso
-    // else pthread_cond_wait(&salas[sala - 1].cond_group, &salas[sala - 1].mutex);
-
-    // pthread_mutex_unlock(&salas[sala - 1].mutex);
 }
 
 
@@ -176,14 +166,11 @@ int main() {
     pthread_t threads[MAX_THREADS];
     ThreadInfo info[MAX_THREADS];
 
-    pthread_barrierattr_t attr;
-    pthread_barrierattr_init(&attr);
-
     // Inicializa sala
     for (int i = 0; i < S; i++) {
         pthread_mutex_init(&salas[i].mutex, NULL);
         pthread_cond_init(&salas[i].cond_espera, NULL);
-        pthread_barrier_init(&salas[i].porta, &attr, GROUP_SIZE);
+        pthread_barrier_init(&salas[i].porta, NULL, GROUP_SIZE);
         salas[i].ocupacao = 0;
         salas[i].esperando = 0;
     }
@@ -211,7 +198,6 @@ int main() {
     }
 
     // Destrói mutexes e variáveis de condição
-    pthread_barrierattr_destroy(&attr);
     for (int i = 0; i < S; i++) {
         pthread_mutex_destroy(&salas[i].mutex);
         pthread_cond_destroy(&salas[i].cond_espera);

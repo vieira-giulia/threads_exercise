@@ -46,11 +46,13 @@ def main():
         # Run the program with input redirection
         with open(input_file, 'r') as infile:
             input_content = infile.read()
+            print(input_content)
             stdout, stderr = run_command(["make", "run"], input_text=input_content)
 
         # Read the expected output
         with open(output_file, 'r') as expected_file:
             expected_output = expected_file.read()
+            print(expected_output)
 
         # Compare outputs
         if compare_outputs(expected_output, stdout):
