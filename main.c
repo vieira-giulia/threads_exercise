@@ -8,12 +8,12 @@
 
 #define MAX_SALAS 10                 // Número máximo de salas definidos na especificação do problema
 #define MAX_THREADS 30               // Número máximo de threads (3 x MAX_SALAS)
-#define GROUP_SIZE 3                   // Número de threads necessárias para entrar na sala
+#define GROUP_SIZE 3                 // Número de threads necessárias para entrar na sala
 
 
-/******************************************************
+/***************************************************************
 Tipo ThreadInfo: guarda dados relevantes sobre as threads
-********************************************************/
+****************************************************************/
 typedef struct {
     int id;                         // identificador da thread
     int t_espera;                   // quanto tempo deve passar até que thread possa entrar em sala
@@ -23,9 +23,9 @@ typedef struct {
 } ThreadInfo;
 
 
-/******************************************************
+/***************************************************************
 Tipo SalaInfo: guarda dados relevantes sobre as salas
-********************************************************/
+****************************************************************/
 typedef struct {
     pthread_mutex_t mutex;          // Mutex para acesso à sala
     pthread_cond_t cond_espera;     // Variável de condição para fila de espera
@@ -39,11 +39,11 @@ typedef struct {
 SalaInfo salas[MAX_SALAS];          // Array de estruturas para as salas
 
 
-/*********************************************************
+/****************************************************************
  Inclua o código a seguir no seu programa, sem alterações.
  Dessa forma a saída automaticamente estará no formato esperado 
  pelo sistema de correção automática.
- *********************************************************/
+ ****************************************************************/
 void passa_tempo(int tid, int sala, int decimos) {
     struct timespec zzz, agora;
     static struct timespec inicio = {0, 0};
@@ -75,12 +75,13 @@ void passa_tempo(int tid, int sala, int decimos) {
 
     printf("%3d ) %2d @%2d\n", tstamp, tid, sala);
 }
-/*********************** FIM DA FUNÇÃO *************************/
+/*********************** FIM DA FUNÇÃO ***************************/
 
 
-/******************************************************
-entra: entra na sala com sincronização de trio
-********************************************************/
+/*****************************************************************
+entra: entra na sala vazia com sincronização de trio
+-- Uso de barrier para permitir que threads entrem apenas em trio
+******************************************************************/
 void entra(int tid, int sala, int tempo) {
     pthread_mutex_lock(&salas[sala - 1].mutex);
 
@@ -118,9 +119,9 @@ void entra(int tid, int sala, int tempo) {
 }
 
 
-/******************************************************
-sai: sai da sala
-********************************************************/
+/**************************************************************
+sai: sai da sala e sinaliza sala vazia
+***************************************************************/
 void sai(int tid, int sala) {
     pthread_mutex_lock(&salas[sala - 1].mutex);
 
@@ -134,10 +135,14 @@ void sai(int tid, int sala) {
 }
 
 
-/******************************************************
+/**************************************************************
 thread_func: relacionada a biblioteca pthreads.
-Generencia o movimento das threads
-********************************************************/
+Generencia o movimento das threads: passa o tempo inicial,
+para cada sala no trajeto, entra assim que possível, passa
+o tempo estipulado e sai. 
+-- Uso de scheduler para permitir que outras threads se movimentem
+se a atual estiver travada.
+***************************************************************/
 void *thread_func(void *arg) {
     // Para uma thread específica
     ThreadInfo *info = (ThreadInfo *)arg;
@@ -156,7 +161,7 @@ void *thread_func(void *arg) {
         passa_tempo(info->id, sala, tempo);   
         // Sai da sala  
         sai(info->id, sala);
-        // Permitir que outras threads executem enquanto essa está parada
+        // Permitir que outras threads executem enquanto esta está parada
         sched_yield();
     }
 
@@ -189,18 +194,20 @@ int main() {
         info[i].tempos = (int *)malloc(info[i].n_salas * sizeof(int));
         for (int j = 0; j < info[i].n_salas; j++) scanf("%d %d", &info[i].salas[j], &info[i].tempos[j]);
 
+        // Inicializa thread em pthreads com as informações salvas em formato ThreadInfd
         pthread_create(&threads[i], NULL, thread_func, (void *)&info[i]);
     }
 
     // Aguarda todas as threads terminarem
     for (int i = 0; i < T; i++) pthread_join(threads[i], NULL);
 
-    // Libera recursos e destrói mutexes e variáveis de condição
+    // Libera recursos alocados dinamicamente
     for (int i = 0; i < T; i++) {
         free(info[i].salas);
         free(info[i].tempos);
     }
 
+    // Destrói mutexes e variáveis de condição
     for (int i = 0; i < S; i++) {
         pthread_mutex_destroy(&salas[i].mutex);
         pthread_cond_destroy(&salas[i].cond_espera);
