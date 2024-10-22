@@ -214,7 +214,8 @@ int main() {
     for (int i = 0; i < S; i++) {
         pthread_mutex_destroy(&salas[i].mutex);
         pthread_cond_destroy(&salas[i].cond_espera);
-        pthread_barrier_init(&salas[i].porta, GROUP_SIZE, GROUP_SIZE);
+        pthread_barrierattr_destroy(&attr);
+        pthread_barrier_destroy(&salas[i].porta);
     }
 
     return 0;
