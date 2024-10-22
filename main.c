@@ -176,11 +176,14 @@ int main() {
     pthread_t threads[MAX_THREADS];
     ThreadInfo info[MAX_THREADS];
 
+    pthread_barrierattr_t attr;
+    pthread_barrierattr_init(&attr);
+
     // Inicializa sala
     for (int i = 0; i < S; i++) {
         pthread_mutex_init(&salas[i].mutex, NULL);
         pthread_cond_init(&salas[i].cond_espera, NULL);
-        pthread_barrier_init(&salas[i].porta, GROUP_SIZE, GROUP_SIZE);
+        pthread_barrier_init(&salas[i].porta, &attr, GROUP_SIZE);
         salas[i].ocupacao = 0;
         salas[i].esperando = 0;
     }
