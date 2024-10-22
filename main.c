@@ -1,12 +1,14 @@
+#define _POSIX_C_SOURCE 200112L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <unistd.h>
 #include <time.h>
 
 
 #define MAX_SALAS 10                 // Número máximo de salas definidos na especificação do problema
 #define MAX_THREADS 30               // Número máximo de threads (3 x MAX_SALAS)
+#define GROUP_SIZE 3                   // Número de threads necessárias para entrar na sala
 
 
 /******************************************************
@@ -25,14 +27,16 @@ typedef struct {
 Tipo SalaInfo: guarda dados relevantes sobre as salas
 ********************************************************/
 typedef struct {
-    pthread_mutex_t mutex;         // Mutex para acesso à sala
-    pthread_cond_t cond_espera;    // Variável de condição para fila de espera
-    pthread_cond_t cond_trio;      // Variável de condição para formar trio
-    int ocupacao;                  // Número de threads atualmente na sala
-    int esperando;                 // Número de threads esperando para entrar
+    pthread_mutex_t mutex;          // Mutex para acesso à sala
+    pthread_cond_t cond_espera;     // Variável de condição para fila de espera
+    pthread_cond_t cond_group;      // Variável de condição para trio entrar junto
+    pthread_barrier_t porta;        // Barreira para entrar na sala
+    int ocupacao;                   // Número de threads atualmente na sala
+    int esperando;                  // Número de threads esperando para entrar
+   
 } SalaInfo;
 
-SalaInfo salas[MAX_SALAS];         // Array de estruturas para as salas
+SalaInfo salas[MAX_SALAS];          // Array de estruturas para as salas
 
 
 /*********************************************************
@@ -77,27 +81,41 @@ void passa_tempo(int tid, int sala, int decimos) {
 /******************************************************
 entra: entra na sala com sincronização de trio
 ********************************************************/
-void entra(int tid, int sala) {
+void entra(int tid, int sala, int tempo) {
     pthread_mutex_lock(&salas[sala - 1].mutex);
 
     // Entra na fila para entrar na sala
     salas[sala - 1].esperando++;
 
-    // A thread só entra quando houver pelo menos 3 threads esperando e a sala estiver vazia
-    while (salas[sala - 1].esperando < 3 || salas[sala - 1].ocupacao > 0) 
+    // Wait until the room is empty and there are at least 3 threads waiting
+    while (salas[sala - 1].ocupacao > 0 || salas[sala - 1].esperando < GROUP_SIZE) 
         pthread_cond_wait(&salas[sala - 1].cond_espera, &salas[sala - 1].mutex);
 
-    // Entra na sala
-    salas[sala - 1].ocupacao++;
-    // Sai da fila
-    salas[sala - 1].esperando--;
+    // Espera na barreira até 3 estarem juntos para entrar
+    pthread_barrier_wait(&salas[sala - 1].porta);
 
-    // Notifica entrada
-    if (salas[sala - 1].ocupacao == 3) pthread_cond_broadcast(&salas[sala - 1].cond_trio);
+    // Sala ocupada por 3 threads
+    salas[sala - 1].ocupacao += GROUP_SIZE;
+    
+    // 3 threads sairam da fila para entrar na sala
+    salas[sala - 1].esperando -= GROUP_SIZE;
 
     pthread_mutex_unlock(&salas[sala - 1].mutex);
-}
+    
+    // // Thread espera sala ficar vazia
+    // while (salas[sala - 1].ocupacao > 0) pthread_cond_wait(&salas[sala - 1].cond_espera, &salas[sala - 1].mutex);
 
+    // // Se houverem pelo menos 3 threads querendo entrar na sala, avisa as outras para entrar e entra
+    // if (salas[sala - 1].esperando >= GROUP_SIZE){
+    //     pthread_cond_broadcast(&salas[sala - 1].cond_group);
+    //     salas[sala - 1].ocupacao++;
+    //     salas[sala - 1].esperando--;   
+    // } 
+    // // Se não, espera pelo aviso
+    // else pthread_cond_wait(&salas[sala - 1].cond_group, &salas[sala - 1].mutex);
+
+    // pthread_mutex_unlock(&salas[sala - 1].mutex);
+}
 
 
 /******************************************************
@@ -114,7 +132,6 @@ void sai(int tid, int sala) {
 
     pthread_mutex_unlock(&salas[sala - 1].mutex);
 }
-
 
 
 /******************************************************
@@ -134,11 +151,13 @@ void *thread_func(void *arg) {
         int tempo = info->tempos[i];
 
         // Entra na sala
-        entra(info->id, sala);   
+        entra(info->id, sala, tempo);
         // Passa tempo na sala
         passa_tempo(info->id, sala, tempo);   
         // Sai da sala  
-        sai(info->id, sala);                    
+        sai(info->id, sala);
+        // Permitir que outras threads executem enquanto essa está parada
+        sched_yield();
     }
 
     pthread_exit(NULL);
@@ -152,27 +171,24 @@ int main() {
     pthread_t threads[MAX_THREADS];
     ThreadInfo info[MAX_THREADS];
 
-    // Cria salas
+    // Inicializa sala
     for (int i = 0; i < S; i++) {
         pthread_mutex_init(&salas[i].mutex, NULL);
         pthread_cond_init(&salas[i].cond_espera, NULL);
-        pthread_cond_init(&salas[i].cond_trio, NULL);
+        pthread_barrier_init(&salas[i].porta, GROUP_SIZE, GROUP_SIZE);
         salas[i].ocupacao = 0;
         salas[i].esperando = 0;
     }
 
-    // Cria threads
+    // Inicializa threads
     for (int i = 0; i < T; i++) {
+        // Salva tempo de espera inicial e número de salas para essa thread percorrer
         scanf("%d %d %d", &info[i].id, &info[i].t_espera, &info[i].n_salas);
-
-        // Alocação dinâmica dos vetores para salas e tempos
+        // Salva lista de salas e tempos para a thread
         info[i].salas = (int *)malloc(info[i].n_salas * sizeof(int));
         info[i].tempos = (int *)malloc(info[i].n_salas * sizeof(int));
-
-        // Salva lista de salas e tempos para a thread
         for (int j = 0; j < info[i].n_salas; j++) scanf("%d %d", &info[i].salas[j], &info[i].tempos[j]);
 
-        // Chama pthreads para essa thread
         pthread_create(&threads[i], NULL, thread_func, (void *)&info[i]);
     }
 
@@ -188,7 +204,7 @@ int main() {
     for (int i = 0; i < S; i++) {
         pthread_mutex_destroy(&salas[i].mutex);
         pthread_cond_destroy(&salas[i].cond_espera);
-        pthread_cond_destroy(&salas[i].cond_trio);
+        pthread_barrier_init(&salas[i].porta, GROUP_SIZE, GROUP_SIZE);
     }
 
     return 0;
