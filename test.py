@@ -18,49 +18,45 @@ test_cases = [
     (10, os.path.join(test_cases_dir, "input_10.txt"), os.path.join(test_cases_dir, "output_10.txt")),
 ]
 
-def run_command(command, input_text=None):
-    """Helper function to run a command and return its output."""
-    result = subprocess.run(command, input=input_text, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    return result.stdout.strip(), result.stderr.strip()
 
-def compare_outputs(expected_output, actual_output):
-    """Compares the expected output with the actual output."""
-    return expected_output.strip() == actual_output.strip()
+def run_c_program(input_data):
+    try:
+        # Run the C program and send the input_data as stdin
+        process = subprocess.Popen(["./ep1"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = process.communicate(input=input_data)
+
+        if process.returncode != 0:
+            print(f"Error running C program: {stderr}")
+            return
+        
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return
+
+    return stdout
 
 def main():
-    # Clean, build the project
-    print("Cleaning project...")
-    stdout, stderr = run_command(["make", "clean"])
-    if stderr:
-        print("Error during cleaning:", stderr)
-
-    print("Building project...")
-    stdout, stderr = run_command(["make"])
-    if stderr:
-        print("Error during build:", stderr)
-
     # Run tests
     for index, input_file, output_file in test_cases:
         print(f"\nRunning test case {index}...")
 
         # Run the program with input redirection
         with open(input_file, 'r') as infile:
-            input_content = infile.read()
-            print(input_content)
-            stdout, stderr = run_command(["make", "run"], input_text=input_content)
+            input_data = infile.read()
+
+        output_data = run_c_program(input_data)
 
         # Read the expected output
         with open(output_file, 'r') as expected_file:
             expected_output = expected_file.read()
-            print(expected_output)
 
         # Compare outputs
-        if compare_outputs(expected_output, stdout):
+        if output_data.strip() == expected_output.strip():
             print(f"Test case {index} passed.")
         else:
             print(f"Test case {index} failed.")
             print(f"Expected:\n{expected_output}")
-            print(f"Actual:\n{stdout}")
+            print(f"Actual:\n{output_data}")
 
 if __name__ == "__main__":
     main()
